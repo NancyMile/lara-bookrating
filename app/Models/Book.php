@@ -21,19 +21,31 @@ class Book extends Model
         return $query->where('title','Like','%'.$title.'%');
     }
 
-    public function scopePopular(Builder $query, $from = null, $to = null ):Builder
+    // counting the reviews without worrying about the order by
+    public function scopeWithReviewsCount(Builder $query, $from = null, $to = null): Builder
     {
         return $query->withCount([
             'reviews' => fn(Builder $q) => $this->dateRangeFilter($q, $from, $to)
-            ])
+        ]);
+    }
+
+    //calculate avg on the reviews rating without worrying about the order by
+    public function scopeWithAvgRating(Builder $query, $from = null, $to = null): Builder
+    {
+        return $query->withAvg([
+            'reviews' => fn(Builder $q) => $this->dateRangeFilter($q, $from, $to)
+            ],'rating');
+    }
+
+    public function scopePopular(Builder $query, $from = null, $to = null ):Builder
+    {
+        return $query->withReviewsCount()
             ->orderBy('reviews_count', 'desc');
     }
 
     public function scopeHighestRated(Builder $query, $from = null, $to = null): Builder
     {
-        return $query->withAvg([
-            'reviews' => fn(Builder $q) => $this->dateRangeFilter($q, $from, $to)
-            ],'rating')
+        return $query->withAvgRating()
             ->orderby('reviews_avg_rating','desc');
     }
 
@@ -81,5 +93,15 @@ class Book extends Model
         return $query->highestRated(now()->subMonth(6),now())
             ->popular(now()->subMonth(6),now())
             ->minReviews(5);
+    }
+
+    //clear the cache when a change happens
+    protected static function booted()
+    {
+        // when a modification is done to a model, // if you use mass assignment,or you use raw query  it wont be trigger,
+        // in database transaction if wont be trigger if the transaction is rolled back
+        //So if you load the model and then modify.. this may be trigged
+        static::updated(fn(Book $book) =>  cache()->forget('book:'.$book->id));
+        static::deleted(fn(Book $book) => cache()->forget('book:'.$book->id));
     }
 }
