@@ -24,5 +24,6 @@ class Review extends Model
         //So if you load the model and then modify.. this may be trigged
         static::updated(fn(Review $review) =>  cache()->forget('book:'.$review->book_id));
         static::deleted(fn(Review $review) => cache()->forget('book:'.$review->book_id));
+        static::created(fn(Review $review) => cache()->forget('book:'.$review->book_id));
     }
 }
